@@ -1,0 +1,5 @@
+minitest:
+    size: '1k'
+    number: [5, 25]
+    pathnamelen: 20
+    pathdepth: 3

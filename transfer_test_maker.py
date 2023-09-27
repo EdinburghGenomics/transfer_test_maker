@@ -5,12 +5,17 @@ from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from random import Random
 from itertools import repeat
+from base64 import b64encode
+
+import yaml
 
 """ Generate some download test data
 """
 def main(args):
 
-    L.basicConfig(level=(L.DEBUG if args.debug else L.INFO))
+    L.basicConfig( level = (L.DEBUG if args.debug else L.INFO),
+                   format = "{message}",
+                   style = "{" )
 
     config = load_config(args.config)
 
@@ -48,11 +53,14 @@ def main(args):
                                     path_depth,
                                     file_extn ):
                 total_files[-1] += 1
-                L.info(fname)
+
+                # Print it
+                L.info(f"{subdir}/{fname}")
+
                 if args.outdir:
-                    fill_file( os.path.join(outdir, fname),
+                    fill_path( os.path.join(args.outdir, subdir, fname),
                                nbytes = file_size,
-                               seed = fname, # Avoid including outdir in seed!
+                               seed = fname, # Avoid including subdir in seed!
                                text = text_files )
 
         L.debug(f"Generated {total_files[-1]} files in {subdir}")
@@ -62,17 +70,18 @@ def main(args):
 def gen_names(fnum, fsize, pad_len, path_depth, file_extn):
     """Generate a list of names as per the design.
     """
-    top_dir = pad_filename(f"size_{fsize}_files_{fsize}", pad_len)
+    # I think we should not pad the top directory
+    top_dir = f"size_{fsize}_files_{fnum}"
 
     for n in range(1, path_depth):
         top_dir += "/" + pad_filename(f"subdir_{n}", pad_len)
 
     # See how many digits in fnum
-    fnum_pad = min(4, len(str(fnum-1)))
+    fnum_pad = max(4, len(str(fnum-1)))
 
     for n in range(fnum):
-        yield top_dir + "/" + pad_filename( f"subdir_{n}",
-                                            minlne = pad_len,
+        yield top_dir + "/" + pad_filename( f"size_{fsize}_{n:0{fnum_pad}d}",
+                                            minlen = pad_len,
                                             extn = file_extn )
 
 def parse_args(*args):
@@ -112,7 +121,6 @@ def fill_file(filename, nbytes, seed=None, text=False):
     rng = Random(seed)
     rbsize = 8 # Maybe making this larger speeds us up?
 
-
     with open(filename, 'wb') as fh:
         written_chunks = 0
 
@@ -121,22 +129,22 @@ def fill_file(filename, nbytes, seed=None, text=False):
             chunks = nbytes // linelen
             extra = nbytes % linelen
 
-            char_src = ( b64encode(random.getrandbits(8*n).to_bytes(n, 'big'))
+            char_src = ( b64encode(rng.getrandbits(8*n).to_bytes(n, 'big'))
                          for n in repeat(rbsize*3, chunks) )
 
-            for bstring in bit_src:
-                fh.write(bstring + "\n")
+            for cstring in char_src:
+                fh.write(cstring + b"\n")
 
             if extra:
-                extra_bits = random.getrandbits(8*rbsize*3).to_bytes(rbsize*3, 'big')
+                extra_bits = rng.getrandbits(8*rbsize*3).to_bytes(rbsize*3, 'big')
                 extra_chars = b64encode(extra_bits)[:extra-1]
-                fh.write(extra_chars + "\n")
+                fh.write(extra_chars + b"\n")
 
         else:
             chunks = nbytes // rbsize
             extra = nbytes % rbsize
 
-            bit_src = ( random.getrandbits(8*n).to_bytes(n, 'big')
+            bit_src = ( rng.getrandbits(8*n).to_bytes(n, 'big')
                         for n in repeat(rbsize, chunks) )
 
             # TODO - can I avoid the loop here?
@@ -144,9 +152,9 @@ def fill_file(filename, nbytes, seed=None, text=False):
                 fh.write(bstring)
 
             if extra:
-                fh.write(random.getrandbits(8*extra).to_bytes(extra, 'big'))
+                fh.write(rng.getrandbits(8*extra).to_bytes(extra, 'big'))
 
-def gen_path(filepath, nbytes, _path_cache=set(), **fill_file_args):
+def fill_path(filepath, nbytes, _path_cache=set(), **fill_file_args):
     """Make the directory path if it does not exist, then
        fill the file with data
     """
@@ -161,7 +169,7 @@ def pad_filename(filename, minlen=0, pad="paddingPADDING", extn=""):
     """Pad out a filename.
     """
     # Make a string long enough to pad even an empty filename
-    plenty_padding = pad * (minlen + 1 / len(pad))
+    plenty_padding = pad * (minlen + 1 // len(pad))
 
     pad_to_add = minlen - (len(filename) + len(extn))
 
