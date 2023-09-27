@@ -119,12 +119,12 @@ def fill_file(filename, nbytes, seed=None, text=False):
     """
     seed = seed if seed is not None else filename
     rng = Random(seed)
-    rbsize = 8 # Maybe making this larger speeds us up?
 
     with open(filename, 'wb') as fh:
         written_chunks = 0
 
         if text:
+            rbsize = 32
             linelen = (rbsize * 4) + 1
             chunks = nbytes // linelen
             extra = nbytes % linelen
@@ -141,6 +141,9 @@ def fill_file(filename, nbytes, seed=None, text=False):
                 fh.write(extra_chars + b"\n")
 
         else:
+            # This seems a good number for speed. Note that changing this changes
+            # the bytes that are generated.
+            rbsize = 1024
             chunks = nbytes // rbsize
             extra = nbytes % rbsize
 
@@ -148,8 +151,7 @@ def fill_file(filename, nbytes, seed=None, text=False):
                         for n in repeat(rbsize, chunks) )
 
             # TODO - can I avoid the loop here?
-            for bstring in bit_src:
-                fh.write(bstring)
+            fh.writelines(bit_src)
 
             if extra:
                 fh.write(rng.getrandbits(8*extra).to_bytes(extra, 'big'))

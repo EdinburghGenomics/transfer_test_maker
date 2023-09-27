@@ -1,0 +1,10 @@
+binary_10G:
+    size: '10G'
+    number: [1]
+    pathnamelen: 0
+    base64: false
+text_10G:
+    size: '10G'
+    number: [1]
+    pathnamelen: 0
+    base64: true
