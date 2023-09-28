@@ -29,16 +29,17 @@ def main(args):
         L.debug(f"Looking at {subdir} in config")
         total_files.append(0)
 
-        # Mandatory stuff
-        if type(params['size']) == int:
-            file_size = params['size']
+        # Only file size(s) is mandatory
+        file_sizes = {}
+        for s in (params['size'] if type(params['size']) == list else [params['size']]):
+            file_sizes[str(s)] = s if (type(s) == int) else convert_to_bytes(s)
+
+        if 'number' in params:
+            assert type(params['number']) == list
+            assert len(params['number']) > 0
+            file_numbers = params['number']
         else:
-            file_size = convert_to_bytes(params['size'])
-
-        assert type(params['number']) == list
-        assert len(params['number']) > 0
-
-        file_numbers = params['number']
+            file_numbers = [1]
 
         # Optional stuff
         pad_len = int(params.get('pathnamelen', 0))
@@ -46,22 +47,23 @@ def main(args):
         text_files = bool(params.get('base64', False))
         file_extn = params.get('extn', '.txt' if text_files else '.dat')
 
-        for fnum in file_numbers:
-            for fname in gen_names( fnum,
-                                    params['size'], # Human readable version
-                                    pad_len,
-                                    path_depth,
-                                    file_extn ):
-                total_files[-1] += 1
+        for printable_fsize, fsize in file_sizes.items():
+            for fnum in file_numbers:
+                for fname in gen_names( fnum,
+                                        printable_fsize,
+                                        pad_len,
+                                        path_depth,
+                                        file_extn ):
+                    total_files[-1] += 1
 
-                # Print it
-                L.info(f"{subdir}/{fname}")
+                    # Print it
+                    L.info(f"{subdir}/{fname}")
 
-                if args.outdir:
-                    fill_path( os.path.join(args.outdir, subdir, fname),
-                               nbytes = file_size,
-                               seed = fname, # Avoid including subdir in seed!
-                               text = text_files )
+                    if args.outdir:
+                        fill_path( os.path.join(args.outdir, subdir, fname),
+                                   nbytes = fsize,
+                                   seed = fname, # Avoid including subdir in seed!
+                                   text = text_files )
 
         L.debug(f"Generated {total_files[-1]} files in {subdir}")
 
